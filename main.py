@@ -1,7 +1,9 @@
 import os
+import sched
+import time
 
 import discord
-from commands.rules import Rules
+from commands.recall import Recall
 from discord import app_commands
 from dotenv import load_dotenv
 
@@ -9,7 +11,8 @@ load_dotenv()
 
 TOKEN = os.getenv("DISCORD")
 GUILD = int(os.getenv("GUILD"))
-env_path = os.getenv("ENV_PATH")
+env_path_rules = os.getenv("ENV_PATH_RULES")
+env_path_recall = os.getenv("ENV_PATH_RECALL")
 guild_object = discord.Object(id=GUILD)
 
 
@@ -24,26 +27,33 @@ class aclient(discord.Client):
             await tree.sync(guild=guild_object)
             self.synced = True
         print(f"We have logged in as {self.user}.")
-        rules._get_env()
+        for guild in self.guilds:
+            if guild.id == guild_object.id:
+                recall._get_env(guild)
+
     
-    async def on_message(self, message: discord.Message):
-        if message.author.id == self.user.id:
+    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
+        if self.user.id == payload.user_id:
             return
         
-        if rules.wait_message and message.channel == rules.channel_wait:
-            await rules.message_rules(message)
+        await recall.check_reaction_add(payload)
 
+async def send_message_periodically(channel: discord.TextChannel, msg: str, reaction: str):
+  message = await channel.send(msg)
+  if message != None:
+    await message.add_reaction(reaction)
 
+async def execute_periodically(scheduler: sched.scheduler, interval, channel: discord.TextChannel, msg: str, reaction: str):
+    scheduler.enter(interval, 1, execute_periodically, (scheduler, interval, channel, msg, reaction))
+    print("Ici")
+    await send_message_periodically(channel, msg, reaction)
 
 client = aclient()
 tree = app_commands.CommandTree(client)
-rules = Rules(client, env_path)
+scheduler = sched.scheduler(time.time, time.sleep)
+recall = Recall(client, env_path_recall, scheduler,execute_periodically)
 
-@tree.command(name="test", description="testing", guild=guild_object)
-async def self(interaction: discord.Interaction, name: str):
-    await interaction.response.send_message(f"Hello {name} !")
-
-tree.add_command(rules, guild=guild_object)
+tree.add_command(recall, guild=guild_object)
 
 client.run(TOKEN)
 
