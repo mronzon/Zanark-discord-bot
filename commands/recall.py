@@ -19,7 +19,6 @@ class Recall(app_commands.Group):
     self.role = None
     self.names = ""
     self.start = False
-    self.stop_time = time(10, 0, 0)
     self.env_path = env_path
     with open(self.env_path, 'r', encoding='UTF-8') as file:
       self.env = json.load(file)
@@ -99,15 +98,6 @@ class Recall(app_commands.Group):
     except:
       await interaction.response.send_message("Pas de rôle donné, veuillez réessayer.", ephemeral=True)
 
-  @app_commands.command(name="settime", description="Permet de définir le temps entre chaque rappel (en minutes)")
-  async def setTime(self, interaction: discord.Interaction, time: int):
-    if not self._check_roles(interaction.user):
-      await interaction.response.send_message("Vous n'avez pas les permissions nécessaires pour lancer cette commande", ephemeral=True)
-      return
-    self.env["time"] = time * 60
-    self._save_env()
-    await interaction.response.send_message("Le temps a été mise à jour")
-
   @app_commands.command(name="reaction", description="Ajouter la réaction qu'ils vont devoir mettre pour arrêter le rappel")
   async def reaction(self, interaction: discord.Interaction, reaction: str):
     if not self._check_roles(interaction.user):
@@ -129,6 +119,13 @@ class Recall(app_commands.Group):
     self._save_env()
     await interaction.response.send_message(f"Le message a bien été enregistré")
 
+  @app_commands.command(name="seemsg", description="Voir le message personnalisé qui a été mis.")
+  async def msg(self, interaction: discord.Interaction):
+    if not self._check_roles(interaction.user):
+      await interaction.response.send_message("Vous n'avez pas les permissions nécessaires pour lancer cette commande", ephemeral=True)
+      return
+    await interaction.response.send_message(self.env["msg"])
+
   @app_commands.command(name="stop", description="Permet de stopper l'envoie de message automatique")
   async def stop(self, interaction: discord.Interaction):
     if not self.start:
@@ -143,12 +140,26 @@ class Recall(app_commands.Group):
         self.start = False
         return
       now = datetime.datetime.now()
-      if now > self.stop_time:
-        return
+      await self.bot.wait_until_ready()
       message = await self.channel.send(self.env['msg'].replace("/mention/", self.names))
       if message != None:
         await message.add_reaction(self.env['reaction'])
-      await asyncio.sleep(self.env["time"])
+      now = datetime.datetime.now()
+      day = day_week[now.weekday()]
+      time_last = datetime.time(9, 45, 0)
+      time_first = datetime.time(9, 30, 0)
+      if day == "vendredi":
+        time_last = datetime.time(9, 15, 0)
+        time_first = datetime.time(9, 0, 0)
+      if now.time() > time_first and time_last > now.time():
+        target_time = datetime.datetime.combine(now.date(), time_last)
+        second_until_target = (target_time - now).total_seconds()
+      elif now.time() > time_last:
+        return
+      else:
+        target_time = datetime.datetime.combine(now.date(), time_first)
+        second_until_target = (target_time - now).total_seconds()
+      await asyncio.sleep(second_until_target)
 
   async def check_reaction_add(self, payload: discord.RawReactionActionEvent):
     for chan in self.category.channels:
