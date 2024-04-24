@@ -1,26 +1,25 @@
-import sched
 import threading
 import time
 from discord import app_commands
 import discord
 import json
 import datetime
+import asyncio
 
 day_week = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
 
 class Recall(app_commands.Group):
   """Manage the command related to the bdg"""
-  def __init__(self, client: discord.Client, env_path, scheduler: sched.scheduler, send_message):
+  def __init__(self, client: discord.Client, env_path):
     super().__init__()
-    self.scheduler = scheduler
-    self.send_message = send_message
-    self.delay = 1
     self.bot = client
     self.env = None
-    self.scheduler_thread = None
+    self.thread = None
     self.category = None
     self.role = None
     self.names = ""
+    self.start = False
+    self.stop_time = time(10, 0, 0)
     self.env_path = env_path
     with open(self.env_path, 'r', encoding='UTF-8') as file:
       self.env = json.load(file)
@@ -53,18 +52,20 @@ class Recall(app_commands.Group):
       if channel != None:
         ids = names.split(" ")
         for id_user in ids:
+          if not '@' in id_user:
+            continue
           id_user = id_user.split("@")[1][:-1]
           try:
             user = interaction.guild.get_member(int(id_user))
           except:
-            await interaction.response.send_message("Veuillez mentionner.", ephemeral=True)
+            await interaction.response.send_message("Veuillez mentionner une bonne personne.", ephemeral=True)
             return
           if user != None:
             await user.add_roles(self.role)
-        
-        await self.send_message(self.scheduler, self.delay, channel, self.env["msg"].replace("/mention/", names), self.env["reaction"])
-        self.scheduler_thread = threading.Thread(target=self.scheduler.run)
-        self.scheduler_thread.start
+        self.channel = channel
+        self.names = names
+        self.start = True
+        self.bot.loop.create_task(self.send_message_periodically())
         await interaction.response.send_message("Rappel automatique lancé", ephemeral=True)
       else:
         await interaction.response.send_message("Impossible de créer le calon, voir avec TeckDown", ephemeral=True)
@@ -98,6 +99,15 @@ class Recall(app_commands.Group):
     except:
       await interaction.response.send_message("Pas de rôle donné, veuillez réessayer.", ephemeral=True)
 
+  @app_commands.command(name="settime", description="Permet de définir le temps entre chaque rappel (en minutes)")
+  async def setTime(self, interaction: discord.Interaction, time: int):
+    if not self._check_roles(interaction.user):
+      await interaction.response.send_message("Vous n'avez pas les permissions nécessaires pour lancer cette commande", ephemeral=True)
+      return
+    self.env["time"] = time * 60
+    self._save_env()
+    await interaction.response.send_message("Le temps a été mise à jour")
+
   @app_commands.command(name="reaction", description="Ajouter la réaction qu'ils vont devoir mettre pour arrêter le rappel")
   async def reaction(self, interaction: discord.Interaction, reaction: str):
     if not self._check_roles(interaction.user):
@@ -121,22 +131,40 @@ class Recall(app_commands.Group):
 
   @app_commands.command(name="stop", description="Permet de stopper l'envoie de message automatique")
   async def stop(self, interaction: discord.Interaction):
-    if self.scheduler_thread == None:
+    if not self.start:
       await interaction.response.send_message("Pas de message automatique de lancé", ephemeral=True)
       return
-    self.scheduler.cancel()
-    self.scheduler_thread.join()
-    self.scheduler_thread = None
+    self.start = False
     await interaction.response.send_message("Arret")
     
-
+  async def send_message_periodically(self):
+    while self.start:
+      if not '@' in self.names:
+        self.start = False
+        return
+      now = datetime.datetime.now()
+      if now > self.stop_time:
+        return
+      message = await self.channel.send(self.env['msg'].replace("/mention/", self.names))
+      if message != None:
+        await message.add_reaction(self.env['reaction'])
+      await asyncio.sleep(self.env["time"])
 
   async def check_reaction_add(self, payload: discord.RawReactionActionEvent):
     for chan in self.category.channels:
       if chan.id == payload.channel_id:
         if str(payload.emoji) == self.env["reaction"]:
           user = discord.utils.get(self.bot.get_all_members(), id=payload.user_id)
-          await user.remove_roles(self.role)          
+          await user.remove_roles(self.role)
+          tmp = ""
+          for name in self.names.split(" "):
+            if not '@' in name or str(user.id) in name:
+              continue
+            tmp += name + " "
+          if tmp != "":
+            tmp = tmp[:-1]
+          self.names = tmp
+
 
   def _get_env(self, guild: discord.Guild):
     if self.env["category"] != 0:

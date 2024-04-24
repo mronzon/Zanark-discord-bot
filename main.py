@@ -38,20 +38,9 @@ class aclient(discord.Client):
         
         await recall.check_reaction_add(payload)
 
-async def send_message_periodically(channel: discord.TextChannel, msg: str, reaction: str):
-  message = await channel.send(msg)
-  if message != None:
-    await message.add_reaction(reaction)
-
-async def execute_periodically(scheduler: sched.scheduler, interval, channel: discord.TextChannel, msg: str, reaction: str):
-    scheduler.enter(interval, 1, execute_periodically, (scheduler, interval, channel, msg, reaction))
-    print("Ici")
-    await send_message_periodically(channel, msg, reaction)
-
 client = aclient()
 tree = app_commands.CommandTree(client)
-scheduler = sched.scheduler(time.time, time.sleep)
-recall = Recall(client, env_path_recall, scheduler,execute_periodically)
+recall = Recall(client, env_path_recall)
 
 tree.add_command(recall, guild=guild_object)
 
