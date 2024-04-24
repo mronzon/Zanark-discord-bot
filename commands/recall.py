@@ -120,7 +120,7 @@ class Recall(app_commands.Group):
     await interaction.response.send_message(f"Le message a bien été enregistré")
 
   @app_commands.command(name="seemsg", description="Voir le message personnalisé qui a été mis.")
-  async def msg(self, interaction: discord.Interaction):
+  async def seemsg(self, interaction: discord.Interaction):
     if not self._check_roles(interaction.user):
       await interaction.response.send_message("Vous n'avez pas les permissions nécessaires pour lancer cette commande", ephemeral=True)
       return
