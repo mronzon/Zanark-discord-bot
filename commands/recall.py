@@ -5,8 +5,12 @@ import discord
 import json
 import datetime
 import asyncio
+import logging
 
 day_week = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("discord")
 
 class Recall(app_commands.Group):
   """Manage the command related to the bdg"""
@@ -17,6 +21,7 @@ class Recall(app_commands.Group):
     self.thread = None
     self.category = None
     self.role = None
+    self.task = None
     self.names = ""
     self.start = False
     self.env_path = env_path
@@ -27,6 +32,9 @@ class Recall(app_commands.Group):
   async def bdg(self, interaction: discord.Interaction, names: str):
     if not self._check_roles(interaction.user):
       await interaction.response.send_message("Vous n'avez pas les permissions nécessaires pour lancer cette commande", ephemeral=True)
+      return
+    if self.start:
+      await interaction.response.send_message("Un rappel est déjà mis. Veuillez faire /recall stop avant.", ephemeral=True)
       return
     if self.role == None:
       await interaction.response.send_message("Vous n'avez pas configurer le rôle.", ephemeral=True)
@@ -49,6 +57,9 @@ class Recall(app_commands.Group):
       
       channel = await interaction.guild.create_text_channel(name=f"rappel-{day}", category=self.category)
       if channel != None:
+        role = discord.utils.get(interaction.guild.roles, id=self.role.id)
+        for member in role.members:
+          await member.remove_roles(self.role)
         ids = names.split(" ")
         for id_user in ids:
           if not '@' in id_user:
@@ -64,7 +75,8 @@ class Recall(app_commands.Group):
         self.channel = channel
         self.names = names
         self.start = True
-        self.bot.loop.create_task(self.send_message_periodically())
+        
+        self.task = self.bot.loop.create_task(self.send_message_periodically())
         await interaction.response.send_message("Rappel automatique lancé", ephemeral=True)
       else:
         await interaction.response.send_message("Impossible de créer le calon, voir avec TeckDown", ephemeral=True)
@@ -128,10 +140,12 @@ class Recall(app_commands.Group):
 
   @app_commands.command(name="stop", description="Permet de stopper l'envoie de message automatique")
   async def stop(self, interaction: discord.Interaction):
-    if not self.start:
+    if not self.start and self.taks != None:
       await interaction.response.send_message("Pas de message automatique de lancé", ephemeral=True)
       return
     self.start = False
+    self.task.cancel()
+    self.task = None
     await interaction.response.send_message("Arret")
     
   async def send_message_periodically(self):
@@ -159,8 +173,12 @@ class Recall(app_commands.Group):
       else:
         target_time = datetime.datetime.combine(now.date(), time_first)
         second_until_target = (target_time - now).total_seconds()
-      await asyncio.sleep(second_until_target)
-
+      try:
+        await asyncio.sleep(second_until_target)
+      except:
+        logging.info("Arret du sleep")
+        return
+  
   async def check_reaction_add(self, payload: discord.RawReactionActionEvent):
     for chan in self.category.channels:
       if chan.id == payload.channel_id:
