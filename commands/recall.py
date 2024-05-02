@@ -153,7 +153,7 @@ class Recall(app_commands.Group):
       if not '@' in self.names:
         self.start = False
         return
-      now = datetime.datetime.now()
+      
       await self.bot.wait_until_ready()
       message = await self.channel.send(self.env['msg'].replace("/mention/", self.names))
       if message != None:
@@ -161,18 +161,26 @@ class Recall(app_commands.Group):
       now = datetime.datetime.now()
       day = day_week[now.weekday()]
       time_last = datetime.time(9, 45, 0)
-      time_first = datetime.time(9, 30, 0)
+      time_mid = datetime.time(9, 30, 0)
+      time_first = datetime.time(9, 0, 0)
+
       if day == "vendredi":
         time_last = datetime.time(9, 15, 0)
-        time_first = datetime.time(9, 0, 0)
-      if now.time() > time_first and time_last > now.time():
-        target_time = datetime.datetime.combine(now.date(), time_last)
-        second_until_target = (target_time - now).total_seconds()
-      elif now.time() > time_last:
+        time_mid = datetime.time(9, 0, 0)
+        time_first = datetime.time(8, 45, 0)
+
+      if now.time() > time_last:
+        self.start = False
         return
+      elif now.time() > time_mid:
+        target_time = time_last
+      elif now.time() > time_first:
+        target_time = time_mid
       else:
-        target_time = datetime.datetime.combine(now.date(), time_first)
-        second_until_target = (target_time - now).total_seconds()
+        target_time = time_first
+      
+      target_time = datetime.datetime.combine(now.date(), target_time)
+      second_until_target = (target_time - now).total_seconds()
       try:
         await asyncio.sleep(second_until_target)
       except:
