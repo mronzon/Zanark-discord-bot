@@ -79,7 +79,7 @@ class Recall(app_commands.Group):
         self.task = self.bot.loop.create_task(self.send_message_periodically())
         await interaction.response.send_message("Rappel automatique lancé", ephemeral=True)
       else:
-        await interaction.response.send_message("Impossible de créer le calon, voir avec TeckDown", ephemeral=True)
+        await interaction.response.send_message("Impossible de créer le salon, voir avec TeckDown", ephemeral=True)
     else:
       await interaction.response.send_message("Veuillez choisir une catégorie avant de faire cette commande.", ephemeral=True)
     
@@ -147,7 +147,16 @@ class Recall(app_commands.Group):
     self.task.cancel()
     self.task = None
     await interaction.response.send_message("Arret")
-    
+  
+  @app_commands.command(name="admin", description="Permet d'ajouter un role admin")
+  async def add_role_admin(self, interaction: discord.Interaction, role: discord.Role):
+    if not self._check_roles(interaction.user) or not interaction.user.guild_permissions.administrator:
+      await interaction.response.send_message("Vous n'avez pas les permissions spéciaux pour lancer cette commande", ephemeral=True)
+      return
+    self.env["roles"].append(role.name)
+    self._save_env()
+    await interaction.response.send_message("Le role admin a été mis à jour")
+
   async def send_message_periodically(self):
     while self.start:
       if not '@' in self.names:
