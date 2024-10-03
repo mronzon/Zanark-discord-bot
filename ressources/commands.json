@@ -1,4 +1,17 @@
 {
     "rules_channel": 1195148149937930321,
-    "reaction_role": []
+    "reaction_role": [
+        {
+            "role": "zanarkand",
+            "reaction": "👍"
+        },
+        {
+            "role": "Midgar",
+            "reaction": "👎"
+        }
+    ],
+    "text_id": 1291504664839192597,
+    "roles": [
+        "Discord-Supervisor"
+    ]
 }

@@ -7,6 +7,8 @@ from commands.recall import Recall
 from discord import app_commands
 from dotenv import load_dotenv
 
+from commands.rules import Rules
+
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD")
@@ -30,6 +32,7 @@ class aclient(discord.Client):
         for guild in self.guilds:
             if guild.id == guild_object.id:
                 recall._get_env(guild)
+                rules.save_guild(guild)
 
     
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
@@ -37,12 +40,27 @@ class aclient(discord.Client):
             return
         
         await recall.check_reaction_add(payload)
+        await rules.check_reaction_add(payload)
+
+    async def on_message(self, message: discord.Message):
+        if message.author.id == self.user.id:
+            return
+        
+        if rules.wait_message and message.channel == rules.channel_wait:
+            await rules.message_rules(message)
+    
+    async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
+        if payload.user_id == self.user.id:
+            return
+        
+        await rules.check_reaction_remove(payload)
 
 client = aclient()
 tree = app_commands.CommandTree(client)
 recall = Recall(client, env_path_recall)
-
+rules = Rules(client, env_path_rules)
 tree.add_command(recall, guild=guild_object)
+tree.add_command(rules, guild=guild_object)
 
 client.run(TOKEN)
 
