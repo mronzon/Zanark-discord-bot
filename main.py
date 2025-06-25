@@ -6,8 +6,10 @@ import discord
 from commands.recall import Recall
 from discord import app_commands
 from dotenv import load_dotenv
+import aiohttp
 
 from commands.rules import Rules
+from commands.bdg import Bdg
 
 load_dotenv()
 
@@ -15,6 +17,7 @@ TOKEN = os.getenv("DISCORD")
 GUILD = int(os.getenv("GUILD"))
 env_path_rules = os.getenv("ENV_PATH_RULES")
 env_path_recall = os.getenv("ENV_PATH_RECALL")
+env_path_bdg = os.getenv("ENV_PATH_BDG")
 guild_object = discord.Object(id=GUILD)
 
 
@@ -45,6 +48,10 @@ class aclient(discord.Client):
     async def on_message(self, message: discord.Message):
         if message.author.id == self.user.id:
             return
+        # Gestion attente image
+        handled = await bdg.handle_message(message)
+        if handled:
+            return
         
         if rules.wait_message and message.channel == rules.channel_wait:
             await rules.message_rules(message)
@@ -59,8 +66,10 @@ client = aclient()
 tree = app_commands.CommandTree(client)
 recall = Recall(client, env_path_recall)
 rules = Rules(client, env_path_rules)
+bdg = Bdg(client, env_path_bdg)
 tree.add_command(recall, guild=guild_object)
 tree.add_command(rules, guild=guild_object)
+tree.add_command(bdg, guild=guild_object)
 
 client.run(TOKEN)
 
