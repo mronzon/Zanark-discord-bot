@@ -16,7 +16,7 @@ class Bdg(app_commands.Group):
             self.env = json.load(file)
 
 
-    @app_commands.command(name="salon", description="Permet d'indiquer le salon textuel dans lequel les règles sont.")
+    @app_commands.command(name="salon", description="Permet d'indiquer le salon textuel dans lequel les images sont envoyées.")
     async def salon(self, interaction: discord.Interaction, channel: discord.TextChannel):  
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("Vous n'avez pas le role nécessaire pour lancer cette commande", ephemeral=True)
