@@ -3,6 +3,7 @@ import sched
 import time
 
 import discord
+from commands.gvg import Gvg
 from commands.recall import Recall
 from discord import app_commands
 from dotenv import load_dotenv
@@ -18,6 +19,7 @@ GUILD = int(os.getenv("GUILD"))
 env_path_rules = os.getenv("ENV_PATH_RULES")
 env_path_recall = os.getenv("ENV_PATH_RECALL")
 env_path_bdg = os.getenv("ENV_PATH_BDG")
+env_path_gvg = os.getenv("ENV_PATH_GVG")
 guild_object = discord.Object(id=GUILD)
 
 
@@ -67,9 +69,10 @@ tree = app_commands.CommandTree(client)
 recall = Recall(client, env_path_recall)
 rules = Rules(client, env_path_rules)
 bdg = Bdg(client, env_path_bdg)
+gvg = Gvg(client, env_path_gvg)
 tree.add_command(recall, guild=guild_object)
 tree.add_command(rules, guild=guild_object)
 tree.add_command(bdg, guild=guild_object)
-
+tree.add_command(gvg, guild=guild_object)
 client.run(TOKEN)
 
