@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 
 class Gvg(app_commands.Group):
-    def __init__(self, client, env_path):
+    def __init__(self, client, env_path, hero_faction_path):
         super().__init__()
         self.client = client
         self.env_path = env_path
@@ -16,6 +16,10 @@ class Gvg(app_commands.Group):
 
         with open(self.env_path, 'r', encoding='UTF-8') as file:
             self.env = json.load(file)
+
+        with open(hero_faction_path, 'r', encoding='utf-8') as file:
+            self.hero_faction = json.load(file)
+
         self.data_path = os.path.join("ressources", "data_gvg.json")
         if os.path.exists(self.data_path):
           with open(self.data_path, 'r', encoding='utf-8') as f:
@@ -124,17 +128,40 @@ class Gvg(app_commands.Group):
                 self.selected_heroes = set()
                 self.selects = []
                 self.parent = parent  # Référence à l'instance de Gvg
-                self.hero_chunks = [all_heroes[i:i+25] for i in range(0, len(all_heroes), 25)]
-                for idx, chunk in enumerate(self.hero_chunks):
-                    row = idx % 5  # 5 menus max par ligne
-                    select = HeroSelect(chunk, idx, self.selected_heroes, row)
+                # Regrouper les héros par faction
+                faction_heroes = {}
+                for hero in all_heroes:
+                    faction = self.parent.hero_faction.get(hero, "Autre")
+                    if faction not in faction_heroes:
+                        faction_heroes[faction] = []
+                    faction_heroes[faction].append(hero)
+                # Créer des menus de 25 héros max, sans jamais couper une faction
+                menus = []
+                current_menu = []
+                current_factions = []
+                for faction in sorted(faction_heroes.keys()):
+                    heroes = sorted(faction_heroes[faction])
+                    # Si la faction ne rentre pas dans le menu courant, on commence un nouveau menu
+                    if current_menu and len(current_menu) + len(heroes) > 25:
+                        menus.append((current_menu, current_factions))
+                        current_menu = []
+                        current_factions = []
+                    current_menu.extend(heroes)
+                    current_factions.append(faction)
+                if current_menu:
+                    menus.append((current_menu, current_factions))
+                for idx, (heroes, factions) in enumerate(menus):
+                    row = idx % 5  # 5 menus max par ligne (mais on ne dépassera pas 5)
+                    placeholder = f"{' + '.join(factions)} ({len(heroes)})"
+                    select = HeroSelect(heroes, idx, self.selected_heroes, row)
+                    select.placeholder = placeholder
                     select.callback = self.make_callback(idx)
                     self.selects.append(select)
                     self.add_item(select)
                 # Place le bouton sur la dernière ligne disponible
-                self.submit_button = self.SubmitButton(self, row=min(len(self.hero_chunks), 4))
+                self.submit_button = self.SubmitButton(self, row=min(len(menus), 4))
                 self.add_item(self.submit_button)
-            
+        
             def make_callback(self, idx):
                 async def callback(interaction_select):
                     all_selected = set()
@@ -161,35 +188,50 @@ class Gvg(app_commands.Group):
                         )
                         return
                     selected_heroes = set(self.view_ref.selected_heroes)
-                    matching_entries = []
+                    matching_entries = {"defense": [], "attack": []}
                     for entry in self.view_ref.parent.data:
                         defense_heroes = set(entry["defense"].split("|"))
                         if defense_heroes == selected_heroes:
-                            matching_entries.append(entry)
+                            matching_entries["defense"].append(entry)
+
+                        attack_heroes = set(entry["attack"].split("|"))
+                        if attack_heroes == selected_heroes:
+                            matching_entries["attack"].append(entry)
+
                     if not matching_entries:
                         await interaction_button.response.edit_message(
-                            content="Aucune équipe trouvée pour cette défense.", view=None
+                            content="Aucune équipe trouvée.", view=None
                         )
                         return
                     from collections import defaultdict
-                    attack_stats = defaultdict(lambda: {"win": 0, "total": 0, "example": None, "relics": set()})
-                    for entry in matching_entries:
+                    attack_stats = defaultdict(lambda: {"win": 0, "total": 0, "team": None, "relics": set()})
+                    for entry in matching_entries["defense"]:
                         attack_heroes = entry["attack"].split("|")
                         attack_key = "|".join(sorted(attack_heroes))
                         if entry["victory"]:
                             attack_stats[attack_key]["win"] += 1
                         attack_stats[attack_key]["total"] += 1
-                        if attack_stats[attack_key]["example"] is None:
-                            attack_stats[attack_key]["example"] = entry["attack"]
+                        if attack_stats[attack_key]["team"] is None:
+                            attack_stats[attack_key]["team"] = entry["attack"]
                         # Ajout des reliques
                         attack_stats[attack_key]["relics"].add(entry.get("attack_relic", ""))
+                    for entry in matching_entries["attack"]:
+                        attack_heroes = entry["defense"].split("|")
+                        attack_key = "|".join(sorted(attack_heroes))
+                        if not entry["victory"]:
+                            attack_stats[attack_key]["win"] += 1
+                        attack_stats[attack_key]["total"] += 1
+                        if attack_stats[attack_key]["team"] is None:
+                            attack_stats[attack_key]["team"] = entry["attack"]
+                        # Ajout des reliques
+                        attack_stats[attack_key]["relics"].add(entry.get("defense_relic", ""))
                     # Calculer le winrate et filtrer > 50%
                     attack_list = []
                     for attack_key, stats in attack_stats.items():
                         winrate = stats["win"] / stats["total"] if stats["total"] > 0 else 0
                         if winrate > 0.5:
                             attack_list.append({
-                                "attack": stats["example"],
+                                "attack": stats["team"],
                                 "win": stats["win"],
                                 "total": stats["total"],
                                 "winrate": winrate,
