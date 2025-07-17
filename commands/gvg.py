@@ -101,6 +101,25 @@ class Gvg(app_commands.Group):
           ephemeral=True
         )
 
+    @app_commands.command(name="removedata", description="Permet de récupéré ainsi que de supprimer les données présent au sein du bot.")
+    async def removeData(self, interaction: discord.Interaction):
+      if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("Vous n'avez pas le role nécessaire pour lancer cette commande", ephemeral=True)
+        return
+      data_path = os.path.join("ressources", "data_gvg.json")
+      if os.path.exists(data_path):
+        await interaction.response.send_message(
+          file=discord.File(data_path)
+        )
+        with open(self.data_path, 'w', encoding='utf-8') as f:
+            json.dump([], f, ensure_ascii=False)
+        self.data = []
+      else:
+        await interaction.response.send_message(
+          "Le fichier 'ressources/data_gvg.json' n'existe pas.",
+          ephemeral=True
+        )
+
     @app_commands.command(name="bestteam", description="Sélectionnez 5 héros pour obtenir la meilleure équipe correspondante.")
     async def getbestteam(self, interaction: discord.Interaction):
         if not self.env["gvg_channel"] == interaction.channel.id:
