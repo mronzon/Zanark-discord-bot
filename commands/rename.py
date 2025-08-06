@@ -9,6 +9,9 @@ class RenameAll(app_commands.Command):
         )
 
     async def rename_all_shek(self, interaction: Interaction):
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Vous n'avez pas les permissions spéciaux pour lancer cette commande", ephemeral=True)
+            return
         await interaction.response.defer()
         guild = interaction.guild
         if not guild:
@@ -39,6 +42,9 @@ class UnrenameAll(app_commands.Command):
         )
 
     async def unrename_all_shek(self, interaction: Interaction):
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Vous n'avez pas les permissions spéciaux pour lancer cette commande", ephemeral=True)
+            return
         await interaction.response.defer()
         guild = interaction.guild
         if not guild:
