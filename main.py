@@ -5,6 +5,7 @@ import time
 import discord
 from commands.gvg import Gvg
 from commands.recall import Recall
+from commands.rename import RenameAll, UnrenameAll
 from discord import app_commands
 from dotenv import load_dotenv
 import aiohttp
@@ -74,5 +75,7 @@ tree.add_command(recall, guild=guild_object)
 tree.add_command(rules, guild=guild_object)
 tree.add_command(bdg, guild=guild_object)
 tree.add_command(gvg, guild=guild_object)
+tree.add_command(RenameAll(), guild=guild_object)
+tree.add_command(UnrenameAll(), guild=guild_object)
 client.run(TOKEN)
 
