@@ -9,18 +9,25 @@ class RenameAll(app_commands.Command):
         )
 
     async def rename_all_shek(self, interaction: Interaction):
+        await interaction.response.defer()
         guild = interaction.guild
         if not guild:
-            await interaction.response.send_message("Commande à utiliser sur un serveur.", ephemeral=True)
+            await interaction.followup.send("Commande à utiliser sur un serveur.", ephemeral=True)
             return
+        members = list(guild.members)
+        total = len(members)
         count = 0
-        for member in guild.members:
+        progress_msg = await interaction.followup.send(f"Renommage en cours... 0/{total}")
+        for member in members:
             try:
                 await member.edit(nick="Shek")
                 count += 1
             except Exception:
                 continue
-        await interaction.response.send_message(f"{count} membres renommés en Shek.")
+            if count % 10 == 0 or count == total:
+                await progress_msg.edit(content=f"Renommage en cours... {count}/{total}")
+        await progress_msg.edit(content=f"{count} membres renommés en Shek.")
+
 
 
 class UnrenameAll(app_commands.Command):
@@ -37,11 +44,16 @@ class UnrenameAll(app_commands.Command):
         if not guild:
             await interaction.followup.send("Commande à utiliser sur un serveur.", ephemeral=True)
             return
+        members = list(guild.members)
+        total = len(members)
         count = 0
-        for member in guild.members:
+        progress_msg = await interaction.followup.send(f"Réinitialisation en cours... 0/{total}")
+        for member in members:
             try:
                 await member.edit(nick=None)
                 count += 1
             except Exception:
                 continue
-        await interaction.followup.send(f"{count} pseudos réinitialisés.")
+            if count % 10 == 0 or count == total:
+                await progress_msg.edit(content=f"Réinitialisation en cours... {count}/{total}")
+        await progress_msg.edit(content=f"{count} pseudos réinitialisés.")
